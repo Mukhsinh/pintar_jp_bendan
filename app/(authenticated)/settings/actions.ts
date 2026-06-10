@@ -53,7 +53,7 @@ export async function saveSettings(
   }
 
   const now = new Date().toISOString()
-  const updatedBy = emp.id
+  const updatedBy = user.id // Fix: Use user.id (Auth UID) to satisfy t_settings_updated_by_fkey constraint
 
   const entries = [
     { key: 'company_info', value: payload.company_info },

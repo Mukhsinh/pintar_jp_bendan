@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Loader2, RefreshCw, MessageCircle, Eye, EyeOff, Mail, Lock } from 'lucide-react'
 import Image from 'next/image'
 import { Footer } from '@/components/layout/Footer'
+import { getCompanyInfo } from '@/lib/services/settings.service'
+
 
 function getErrorMessage(code: string | null): string | null {
   if (!code) return null
@@ -28,13 +30,51 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showClear, setShowClear] = useState(false)
+  const [companyInfo, setCompanyInfo] = useState<{
+    name: string;
+    appName: string;
+    address: string;
+    logo: string;
+  } | null>(null)
+  const [isReady, setIsReady] = useState(false)
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    const code = searchParams.get('error')
-    if (code) setError(getErrorMessage(code))
-    clearOldSession()
-  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+    async function init() {
+      try {
+        // Try to load from cache first to avoid flicker
+        const cached = localStorage.getItem('company_info_cache')
+        if (cached) {
+          try {
+            setCompanyInfo(JSON.parse(cached))
+            // Even if cached, we still want to finish loading state
+          } catch (e) {
+            localStorage.removeItem('company_info_cache')
+          }
+        }
+
+        const info = await getCompanyInfo()
+        if (info) {
+          setCompanyInfo(info)
+          localStorage.setItem('company_info_cache', JSON.stringify(info))
+        }
+      } catch (err) {
+        console.error('Failed to load company info:', err)
+      } finally {
+        setIsReady(true)
+      }
+
+      // Check for errors in URL
+      const code = searchParams.get('error')
+      if (code) setError(getErrorMessage(code))
+
+      // Clean up old session
+      clearOldSession()
+    }
+    init()
+  }, [searchParams])
+
+
 
   const clearOldSession = () => {
     try {
@@ -82,6 +122,14 @@ export default function LoginPage() {
 
   const waUrl = `https://wa.me/6285726112001?text=${encodeURIComponent('Halo, saya memerlukan bantuan untuk mengakses aplikasi JASPEL. Mohon bantuannya.')}`
 
+  if (!isReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50/50 px-4 py-10 font-sans">
 
@@ -90,24 +138,31 @@ export default function LoginPage() {
 
         {/* Logo & Nama Rumah Sakit */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center mb-4 overflow-hidden">
-            <Image
-              src="/Logo rsud goeteng.jpeg"
-              alt="Logo RSUD Goeteng"
-              width={88}
-              height={88}
-              className="object-contain"
-              priority
-            />
+          <div className="w-24 h-24 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center mb-4 overflow-hidden p-1.5">
+            {companyInfo?.logo ? (
+              <img
+                src={companyInfo.logo}
+                alt={companyInfo.name || "Logo Hospital"}
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600 font-bold text-2xl">
+                {companyInfo?.name?.charAt(0) || "B"}
+              </div>
+            )}
           </div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight text-center leading-tight">
-            RSUD GOETENG
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight text-center leading-tight uppercase">
+            {companyInfo?.name || "RSUD BENDAN"}
           </h1>
-          <p className="text-xs text-slate-400 font-semibold tracking-widest uppercase mt-1">
-            Taroenadibrata Purbalingga
+          <p className="text-[11px] text-blue-600 font-extrabold tracking-widest uppercase mt-1 text-center">
+            {companyInfo?.appName || "Aplikasi PINTAR-JP"}
+          </p>
+          <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-2 text-center max-w-[280px] leading-relaxed">
+            {companyInfo?.address || "Jl. Sriwijaya No. 2, Kota Pekalongan"}
           </p>
           <div className="w-12 h-[2px] bg-blue-200 rounded-full mt-3" />
         </div>
+
 
         {/* Form Card */}
         <div className="bg-white rounded-3xl shadow-[0_8px_40px_rgba(0,0,0,0.07)] border border-slate-100 p-8">

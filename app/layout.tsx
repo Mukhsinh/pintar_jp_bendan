@@ -4,13 +4,28 @@ import { SettingsProvider } from "@/lib/contexts/settings-context";
 import { AuthErrorHandler } from "@/components/AuthErrorHandler";
 import { Toaster } from 'sonner';
 
-export const metadata: Metadata = {
-  title: "JASPEL - Enterprise Incentive & KPI System",
-  description: "Sistem Manajemen Insentif dan KPI Berbasis P1, P2, P3",
-  icons: {
-    icon: '/favicon.svg',
-  },
-};
+import { createClient } from "@/lib/supabase/server";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('t_settings')
+    .select('value')
+    .eq('key', 'company_info')
+    .maybeSingle();
+
+  const companyInfo = data?.value as any;
+  const orgName = companyInfo?.name || "RSUD BENDAN";
+  const appName = companyInfo?.appName || "Aplikasi PINTAR-JP";
+
+  return {
+    title: `${orgName} - ${appName}`,
+    description: "Sistem Manajemen Insentif dan KPI",
+    icons: {
+      icon: '/favicon.svg',
+    },
+  };
+}
 
 export default function RootLayout({
   children,

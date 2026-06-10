@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Plus, BookOpen } from 'lucide-react'
 import PoolTable from '@/components/pool/PoolTable'
-import PoolFormDialog from '@/components/pool/PoolFormDialog'
 import PoolDetailsDialog from '@/components/pool/PoolDetailsDialog'
 
 interface Pool {
@@ -26,7 +25,6 @@ interface Pool {
 export default function PoolManagementPage() {
   const [pools, setPools] = useState<Pool[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -67,7 +65,7 @@ export default function PoolManagementPage() {
 
   const handleCreatePool = useCallback(() => {
     setSelectedPool(null)
-    setIsFormDialogOpen(true)
+    setIsDetailsDialogOpen(true)
   }, [])
 
   const handleViewPool = useCallback((pool: Pool) => {
@@ -195,11 +193,7 @@ export default function PoolManagementPage() {
         </CardContent>
       </Card>
 
-      <PoolFormDialog
-        open={isFormDialogOpen}
-        onOpenChange={setIsFormDialogOpen}
-        onSuccess={loadPools}
-      />
+      {/* Shared Dialog for Create & View Detail */}
 
       <PoolDetailsDialog
         open={isDetailsDialogOpen}

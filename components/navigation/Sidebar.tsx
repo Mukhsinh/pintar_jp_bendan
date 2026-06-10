@@ -216,16 +216,16 @@ export default function Sidebar() {
   useEffect(() => {
     const handleStorageChange = () => {
       if (!user) return
-      ; (async () => {
-        try {
-          const supabase = createClient()
-          const { data } = await supabase.from('t_settings').select('value').eq('key', 'company_info').maybeSingle()
-          if (data) {
-            setCompanyInfo(data.value)
-            try { localStorage.setItem('sidebar-company-info', JSON.stringify({ value: data.value, ts: Date.now() })) } catch { }
-          }
-        } catch { }
-      })()
+        ; (async () => {
+          try {
+            const supabase = createClient()
+            const { data } = await supabase.from('t_settings').select('value').eq('key', 'company_info').maybeSingle()
+            if (data) {
+              setCompanyInfo(data.value)
+              try { localStorage.setItem('sidebar-company-info', JSON.stringify({ value: data.value, ts: Date.now() })) } catch { }
+            }
+          } catch { }
+        })()
     }
 
     const handleSidebarRefresh = () => {
@@ -260,7 +260,7 @@ export default function Sidebar() {
   // ── Skeleton (shown while loading or not mounted) ──────────────────────────
   const SkeletonContent = () => (
     <div className="flex flex-col h-full bg-white border-r border-gray-100">
-      <div className="p-5 relative overflow-hidden" style={{background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 40%, #3b82f6 100%)'}}>
+      <div className="p-5 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 40%, #3b82f6 100%)' }}>
         <div className="h-8 bg-white/20 rounded-2xl animate-pulse" />
       </div>
       <div className="p-4 space-y-2 flex-1">
@@ -289,14 +289,14 @@ export default function Sidebar() {
   }: SidebarInnerProps) => (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="relative overflow-hidden flex-shrink-0" style={{background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 40%, #3b82f6 100%)'}}>
+      <div className="relative overflow-hidden flex-shrink-0" style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 40%, #3b82f6 100%)' }}>
         {/* Decorative circles */}
-        <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-20" style={{background: 'radial-gradient(circle, #93c5fd, transparent)'}} />
-        <div className="absolute -bottom-4 -left-4 w-20 h-20 rounded-full opacity-15" style={{background: 'radial-gradient(circle, #bfdbfe, transparent)'}} />
+        <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, #93c5fd, transparent)' }} />
+        <div className="absolute -bottom-4 -left-4 w-20 h-20 rounded-full opacity-15" style={{ background: 'radial-gradient(circle, #bfdbfe, transparent)' }} />
         <div className="absolute top-2 right-16 w-10 h-10 rounded-full opacity-10 bg-white" />
         <div className="absolute bottom-1 right-6 w-6 h-6 rounded-full opacity-10 bg-white" />
         {/* Diagonal stripe accent */}
-        <div className="absolute inset-0 opacity-5" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.8) 8px, rgba(255,255,255,0.8) 9px)'}} />
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.8) 8px, rgba(255,255,255,0.8) 9px)' }} />
 
         <div className="relative p-5 border-b border-blue-500/30">
           <div className="flex items-center justify-between">
@@ -305,24 +305,37 @@ export default function Sidebar() {
                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md flex-shrink-0 overflow-hidden">
                   {companyInfo?.logo
                     ? <img src={companyInfo.logo} alt="Logo" className="w-full h-full object-contain" />
-                    : <span className="text-orange-600 font-black text-xl">P</span>
+                    : <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600 font-bold text-xl leading-none">
+                      {String(companyInfo?.appName || 'P').charAt(0)}
+                    </div>
                   }
                 </div>
                 <div className="min-w-0">
                   <h1
                     className="truncate leading-tight uppercase"
                     style={{
-                      fontSize: '17px',
+                      fontSize: '15px',
                       fontWeight: 900,
-                      color: '#f97316',
-                      textShadow: '0 1px 3px rgba(0,0,0,0.5), 0 0 8px rgba(0,0,0,0.3)',
+                      color: '#ffffff',
+                      textShadow: '0 1px 3px rgba(0,0,0,0.3)',
                       fontFamily: '"Segoe UI", system-ui, sans-serif',
-                      letterSpacing: '0.1em',
+                      letterSpacing: '0.05em',
                     }}
                   >
-                    {companyInfo?.appName || 'PINTAR-JP'}
+                    {companyInfo?.name || 'RSUD BENDAN'}
                   </h1>
-                  <p className="text-[13px] font-semibold text-white/90 truncate mt-0.5">Aplikasi Pintar-JP</p>
+                  <p
+                    className="truncate mt-0.5"
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#f97316', // Orange accent for the app name
+                      textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    {companyInfo?.appName || 'Aplikasi PINTAR-JP'}
+                  </p>
                 </div>
               </div>
             )}
@@ -330,7 +343,9 @@ export default function Sidebar() {
               <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-lg mx-auto">
                 {companyInfo?.logo
                   ? <img src={companyInfo.logo} alt="Logo" className="w-full h-full object-contain p-1" />
-                  : <span className="text-orange-600 font-black text-base">P</span>
+                  : <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600 font-bold text-base">
+                    {String(companyInfo?.appName || 'P').charAt(0)}
+                  </div>
                 }
               </div>
             )}

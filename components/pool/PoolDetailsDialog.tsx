@@ -66,15 +66,28 @@ export default function PoolDetailsDialog({
   const [editingDeduction, setEditingDeduction] = useState<string | null>(null)
   const [allocationPercentage, setAllocationPercentage] = useState('')
 
+  // Creation state
+  const [internalPool, setInternalPool] = useState<Pool | null>(pool)
+  const [createPeriod, setCreatePeriod] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   useEffect(() => {
+    setInternalPool(pool)
     if (pool && open) {
-      loadPoolItems()
+      loadPoolItems(pool.id)
       setAllocationPercentage(pool.global_allocation_percentage.toString())
+    } else if (!pool && open) {
+      const now = new Date()
+      setCreatePeriod(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`)
+      setAllocationPercentage('100.00')
+      setRevenueItems([])
+      setDeductionItems([])
     }
   }, [pool, open])
 
-  async function loadPoolItems() {
-    if (!pool) return
+  async function loadPoolItems(poolId?: string) {
+    const id = poolId || internalPool?.id
+    if (!id) return
 
     setIsLoading(true)
     try {
@@ -83,7 +96,7 @@ export default function PoolDetailsDialog({
       const { data: revenueData, error: revenueError } = await supabase
         .from('t_pool_revenue')
         .select('*')
-        .eq('pool_id', pool.id)
+        .eq('pool_id', id)
         .order('created_at')
 
       if (revenueError) throw revenueError
@@ -93,7 +106,7 @@ export default function PoolDetailsDialog({
       const { data: deductionData, error: deductionError } = await supabase
         .from('t_pool_deduction')
         .select('*')
-        .eq('pool_id', pool.id)
+        .eq('pool_id', id)
         .order('created_at')
 
       if (deductionError) throw deductionError
@@ -105,9 +118,56 @@ export default function PoolDetailsDialog({
     }
   }
 
+  async function handleCreatePool() {
+    if (!createPeriod) return
+    setIsSubmitting(true)
+
+    try {
+      const supabase = createClient()
+
+      // Check if period already exists
+      const { data: existingPool } = await supabase
+        .from('t_pool')
+        .select('id')
+        .eq('period', createPeriod)
+        .maybeSingle()
+
+      if (existingPool) {
+        alert('Pool sudah ada untuk periode ini')
+        setIsSubmitting(false)
+        return
+      }
+
+      // Create new pool
+      const { data, error } = await supabase
+        .from('t_pool')
+        .insert({
+          period: createPeriod,
+          global_allocation_percentage: parseFloat(allocationPercentage) || 100,
+          revenue_total: 0,
+          deduction_total: 0,
+          status: 'draft'
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setInternalPool(data)
+      onUpdate() // Refresh parent list
+      // Items will be empty initially anyway
+    } catch (error: any) {
+      console.error('Error creating pool:', error)
+      alert(error.message || 'Gagal membuat pool')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   async function handleAddRevenue() {
-    if (!pool || !revenueForm.description || !revenueForm.amount) return
-    if (pool.status !== 'draft') {
+    const activePool = internalPool
+    if (!activePool || !revenueForm.description || !revenueForm.amount) return
+    if (activePool.status !== 'draft') {
       alert('Tidak dapat mengubah pool yang sudah disetujui')
       return
     }
@@ -132,7 +192,7 @@ export default function PoolDetailsDialog({
         const { error } = await supabase
           .from('t_pool_revenue')
           .insert({
-            pool_id: pool.id,
+            pool_id: activePool.id,
             description: revenueForm.description,
             amount: parseFloat(revenueForm.amount)
           })
@@ -140,9 +200,9 @@ export default function PoolDetailsDialog({
         if (error) throw error
       }
 
-      await updatePoolTotals()
+      await updatePoolTotals(activePool.id)
       setRevenueForm({ description: '', amount: '' })
-      await loadPoolItems()
+      await loadPoolItems(activePool.id)
       onUpdate()
     } catch (error: any) {
       console.error('Error saving revenue:', error)
@@ -164,7 +224,8 @@ export default function PoolDetailsDialog({
   }
 
   async function handleDeleteRevenue(id: string) {
-    if (!pool || pool.status !== 'draft') {
+    const activePool = internalPool || pool
+    if (!activePool || activePool.status !== 'draft') {
       alert('Tidak dapat mengubah pool yang sudah disetujui')
       return
     }
@@ -190,8 +251,9 @@ export default function PoolDetailsDialog({
   }
 
   async function handleAddDeduction() {
-    if (!pool || !deductionForm.description || !deductionForm.amount) return
-    if (pool.status !== 'draft') {
+    const activePool = internalPool
+    if (!activePool || !deductionForm.description || !deductionForm.amount) return
+    if (activePool.status !== 'draft') {
       alert('Tidak dapat mengubah pool yang sudah disetujui')
       return
     }
@@ -216,7 +278,7 @@ export default function PoolDetailsDialog({
         const { error } = await supabase
           .from('t_pool_deduction')
           .insert({
-            pool_id: pool.id,
+            pool_id: activePool.id,
             description: deductionForm.description,
             amount: parseFloat(deductionForm.amount)
           })
@@ -224,9 +286,9 @@ export default function PoolDetailsDialog({
         if (error) throw error
       }
 
-      await updatePoolTotals()
+      await updatePoolTotals(activePool.id)
       setDeductionForm({ description: '', amount: '' })
-      await loadPoolItems()
+      await loadPoolItems(activePool.id)
       onUpdate()
     } catch (error: any) {
       console.error('Error saving deduction:', error)
@@ -248,7 +310,8 @@ export default function PoolDetailsDialog({
   }
 
   async function handleDeleteDeduction(id: string) {
-    if (!pool || pool.status !== 'draft') {
+    const activePool = internalPool || pool
+    if (!activePool || activePool.status !== 'draft') {
       alert('Tidak dapat mengubah pool yang sudah disetujui')
       return
     }
@@ -273,8 +336,9 @@ export default function PoolDetailsDialog({
     }
   }
 
-  async function updatePoolTotals() {
-    if (!pool) return
+  async function updatePoolTotals(poolId?: string) {
+    const id = poolId || internalPool?.id
+    if (!id) return
 
     try {
       const supabase = createClient()
@@ -282,7 +346,7 @@ export default function PoolDetailsDialog({
       const { data: revenueData } = await supabase
         .from('t_pool_revenue')
         .select('amount')
-        .eq('pool_id', pool.id)
+        .eq('pool_id', id)
 
       const revenueTotal = revenueData?.reduce((sum, item) => sum + Number(item.amount), 0) || 0
 
@@ -290,37 +354,41 @@ export default function PoolDetailsDialog({
       const { data: deductionData } = await supabase
         .from('t_pool_deduction')
         .select('amount')
-        .eq('pool_id', pool.id)
+        .eq('pool_id', id)
 
       const deductionTotal = deductionData?.reduce((sum, item) => sum + Number(item.amount), 0) || 0
 
       // Update pool
-      const { error } = await supabase
+      const { error, data: updatedPool } = await supabase
         .from('t_pool')
         .update({
           revenue_total: revenueTotal,
           deduction_total: deductionTotal
         })
-        .eq('id', pool.id)
+        .eq('id', id)
+        .select()
+        .single()
 
       if (error) throw error
+      if (updatedPool) setInternalPool(updatedPool)
     } catch (error) {
       console.error('Error updating pool totals:', error)
     }
   }
 
   async function handleUpdatePercentage() {
-    if (!pool || !allocationPercentage) return
-    if (pool.status !== 'draft') return
+    const activePool = internalPool || pool
+    if (!activePool || !allocationPercentage) return
+    if (activePool.status !== 'draft') return
 
     const percentage = parseFloat(allocationPercentage)
     if (isNaN(percentage) || percentage < 0 || percentage > 100) {
       alert('Persentase harus antara 0 dan 100')
-      setAllocationPercentage(pool.global_allocation_percentage.toString())
+      setAllocationPercentage(activePool.global_allocation_percentage.toString())
       return
     }
 
-    if (percentage === pool.global_allocation_percentage) return
+    if (percentage === activePool.global_allocation_percentage) return
 
     try {
       const supabase = createClient()
@@ -329,232 +397,280 @@ export default function PoolDetailsDialog({
         .update({
           global_allocation_percentage: percentage
         })
-        .eq('id', pool.id)
+        .eq('id', activePool.id)
 
       if (error) throw error
       onUpdate()
     } catch (error: any) {
       console.error('Error updating percentage:', error)
       alert(error.message || 'Gagal memperbarui persentase')
-      setAllocationPercentage(pool.global_allocation_percentage.toString())
+      setAllocationPercentage(activePool.global_allocation_percentage.toString())
     }
   }
 
   async function handleFinalSave() {
-    if (isDraft) {
+    const currentPool = internalPool || pool
+    if (currentPool && isDraft) {
       const percentage = parseFloat(allocationPercentage)
-      if (!isNaN(percentage) && percentage !== pool.global_allocation_percentage) {
+      if (!isNaN(percentage) && percentage !== currentPool.global_allocation_percentage) {
         await handleUpdatePercentage()
       }
     }
     onOpenChange(false)
   }
 
-  if (!pool) return null
+  if (!open) return null
 
-  const isDraft = pool.status === 'draft'
+  const activePool = internalPool || pool
+  const isDraft = activePool ? activePool.status === 'draft' : true
+  const isCreateMode = !internalPool && !pool
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Detail Pool - {pool.period}</DialogTitle>
+          <DialogTitle>
+            {isCreateMode ? 'Buat Pool Baru' : `Detail Pool - ${internalPool?.period || pool?.period}`}
+          </DialogTitle>
           <DialogDescription>
-            Status: <span className="font-semibold">{pool.status.toUpperCase()}</span>
-            {!isDraft && ' (Hanya Baca)'}
+            {isCreateMode
+              ? 'Tentukan periode untuk membuat pool keuangan baru'
+              : <>Status: <span className="font-semibold">{internalPool?.status.toUpperCase() || pool?.status.toUpperCase()}</span>{!isDraft && ' (Hanya Baca)'}</>
+            }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          <div className="grid grid-cols-4 gap-2 p-3 bg-gray-50 border border-gray-100 rounded-lg mb-6">
-            <div className="px-2">
-              <p className="text-[10px] uppercase font-bold text-gray-500 mb-0.5">Total Pendapatan</p>
-              <p className="text-sm font-semibold text-gray-900">{formatCurrency(pool.revenue_total)}</p>
-            </div>
-            <div className="px-2 border-l border-gray-200">
-              <p className="text-[10px] uppercase font-bold text-gray-500 mb-0.5">Total Potongan</p>
-              <p className="text-sm font-semibold text-gray-900">{formatCurrency(pool.deduction_total)}</p>
-            </div>
-            <div className="px-2 border-l border-gray-200">
-              <p className="text-[10px] uppercase font-bold text-blue-600 mb-0.5">Pool Bersih</p>
-              <p className="text-base font-bold text-blue-700">{formatCurrency(pool.net_pool || 0)}</p>
-            </div>
-            <div className="px-2 border-l border-gray-200">
-              <p className="text-[10px] uppercase font-bold text-green-600 mb-0.5">Dialokasikan ({pool.global_allocation_percentage}%)</p>
-              <p className="text-base font-bold text-green-700">{formatCurrency(pool.allocated_amount || 0)}</p>
-            </div>
-          </div>
-
-          {/* Revenue Items */}
-          <div>
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-lg font-semibold">Item Pendapatan</h3>
-            </div>
-
-            {isDraft && (
-              <div className="flex gap-2 mb-3">
+          {isCreateMode ? (
+            <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-blue-800 uppercase tracking-wider">Periode *</label>
                 <Input
-                  placeholder="Deskripsi"
-                  value={revenueForm.description}
-                  onChange={(e) => setRevenueForm({ ...revenueForm, description: e.target.value })}
+                  type="month"
+                  value={createPeriod}
+                  onChange={(e) => setCreatePeriod(e.target.value)}
+                  className="bg-white"
                 />
-                <Input
-                  type="number"
-                  placeholder="Jumlah"
-                  value={revenueForm.amount}
-                  onChange={(e) => setRevenueForm({ ...revenueForm, amount: e.target.value })}
-                  className="w-40"
-                />
-                <Button onClick={handleAddRevenue} size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  {editingRevenue ? 'Simpan' : 'Tambah'}
-                </Button>
-                {editingRevenue && (
-                  <Button onClick={handleCancelEditRevenue} size="sm" variant="outline">
-                    Batal
-                  </Button>
-                )}
               </div>
-            )}
-
-            <div className="space-y-2">
-              {revenueItems.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">Belum ada item pendapatan</p>
-              ) : (
-                revenueItems.map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-3 bg-white border rounded">
-                    <div className="flex-1">
-                      <p className="font-medium">{item.description}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <p className="font-semibold">{formatCurrency(item.amount)}</p>
-                      {isDraft && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditRevenue(item)}
-                          >
-                            <Pencil className="h-4 w-4 text-blue-600" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDeleteRevenue(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Deduction Items */}
-          <div>
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-lg font-semibold">Item Potongan</h3>
-            </div>
-
-            {isDraft && (
-              <div className="flex gap-2 mb-3">
-                <Input
-                  placeholder="Deskripsi"
-                  value={deductionForm.description}
-                  onChange={(e) => setDeductionForm({ ...deductionForm, description: e.target.value })}
-                />
-                <Input
-                  type="number"
-                  placeholder="Jumlah"
-                  value={deductionForm.amount}
-                  onChange={(e) => setDeductionForm({ ...deductionForm, amount: e.target.value })}
-                  className="w-40"
-                />
-                <Button onClick={handleAddDeduction} size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  {editingDeduction ? 'Simpan' : 'Tambah'}
-                </Button>
-                {editingDeduction && (
-                  <Button onClick={handleCancelEditDeduction} size="sm" variant="outline">
-                    Batal
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-blue-800 uppercase tracking-wider">Alokasi Global (%) *</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={allocationPercentage}
+                    onChange={(e) => setAllocationPercentage(e.target.value)}
+                    className="bg-white"
+                  />
+                  <Button onClick={handleCreatePool} disabled={isSubmitting}>
+                    {isSubmitting ? 'Memproses...' : 'Lanjut'}
                   </Button>
-                )}
+                </div>
               </div>
-            )}
-
-            <div className="space-y-2">
-              {deductionItems.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">Belum ada item potongan</p>
-              ) : (
-                deductionItems.map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-3 bg-white border rounded">
-                    <div className="flex-1">
-                      <p className="font-medium">{item.description}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <p className="font-semibold">{formatCurrency(item.amount)}</p>
-                      {isDraft && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditDeduction(item)}
-                          >
-                            <Pencil className="h-4 w-4 text-blue-600" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDeleteDeduction(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
+              <p className="col-span-2 text-[10px] text-blue-600 font-medium">
+                Pilih periode dan tentukan persentase alokasi, lalu klik Lanjut untuk menambahkan rincian.
+              </p>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-2 p-3 bg-gray-50 border border-gray-100 rounded-lg mb-6">
+              <div className="px-2">
+                <p className="text-[10px] uppercase font-bold text-gray-500 mb-0.5">Total Pendapatan</p>
+                <p className="text-sm font-semibold text-gray-900">{formatCurrency(internalPool?.revenue_total || pool?.revenue_total || 0)}</p>
+              </div>
+              <div className="px-2 border-l border-gray-200">
+                <p className="text-[10px] uppercase font-bold text-gray-500 mb-0.5">Total Potongan</p>
+                <p className="text-sm font-semibold text-gray-900">{formatCurrency(internalPool?.deduction_total || pool?.deduction_total || 0)}</p>
+              </div>
+              <div className="px-2 border-l border-gray-200">
+                <p className="text-[10px] uppercase font-bold text-blue-600 mb-0.5">Pool Bersih</p>
+                <p className="text-base font-bold text-blue-700">{formatCurrency(internalPool?.net_pool || pool?.net_pool || 0)}</p>
+              </div>
+              <div className="px-2 border-l border-gray-200">
+                <p className="text-[10px] uppercase font-bold text-green-600 mb-0.5">Dialokasikan ({internalPool?.global_allocation_percentage || pool?.global_allocation_percentage}%)</p>
+                <p className="text-base font-bold text-green-700">{formatCurrency(internalPool?.allocated_amount || pool?.allocated_amount || 0)}</p>
+              </div>
+            </div>
+          )}
+
+          {!isCreateMode && (
+            <div className="space-y-8">
+              {/* Revenue Items */}
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-lg font-semibold">Item Pendapatan</h3>
+                </div>
+
+                {isDraft && (
+                  <div className="flex gap-2 mb-3">
+                    <Input
+                      placeholder="Deskripsi"
+                      value={revenueForm.description}
+                      onChange={(e) => setRevenueForm({ ...revenueForm, description: e.target.value })}
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Jumlah"
+                      value={revenueForm.amount}
+                      onChange={(e) => setRevenueForm({ ...revenueForm, amount: e.target.value })}
+                      className="w-40"
+                    />
+                    <Button onClick={handleAddRevenue} size="sm">
+                      <Plus className="h-4 w-4 mr-1" />
+                      {editingRevenue ? 'Simpan' : 'Tambah'}
+                    </Button>
+                    {editingRevenue && (
+                      <Button onClick={handleCancelEditRevenue} size="sm" variant="outline">
+                        Batal
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {revenueItems.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">Belum ada item pendapatan</p>
+                  ) : (
+                    revenueItems.map(item => (
+                      <div key={item.id} className="flex justify-between items-center p-3 bg-white border rounded">
+                        <div className="flex-1">
+                          <p className="font-medium">{item.description}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <p className="font-semibold">{formatCurrency(item.amount)}</p>
+                          {isDraft && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditRevenue(item)}
+                              >
+                                <Pencil className="h-4 w-4 text-blue-600" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteRevenue(item.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Deduction Items */}
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-lg font-semibold">Item Potongan</h3>
+                </div>
+
+                {isDraft && (
+                  <div className="flex gap-2 mb-3">
+                    <Input
+                      placeholder="Deskripsi"
+                      value={deductionForm.description}
+                      onChange={(e) => setDeductionForm({ ...deductionForm, description: e.target.value })}
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Jumlah"
+                      value={deductionForm.amount}
+                      onChange={(e) => setDeductionForm({ ...deductionForm, amount: e.target.value })}
+                      className="w-40"
+                    />
+                    <Button onClick={handleAddDeduction} size="sm">
+                      <Plus className="h-4 w-4 mr-1" />
+                      {editingDeduction ? 'Simpan' : 'Tambah'}
+                    </Button>
+                    {editingDeduction && (
+                      <Button onClick={handleCancelEditDeduction} size="sm" variant="outline">
+                        Batal
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {deductionItems.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">Belum ada item potongan</p>
+                  ) : (
+                    deductionItems.map(item => (
+                      <div key={item.id} className="flex justify-between items-center p-3 bg-white border rounded">
+                        <div className="flex-1">
+                          <p className="font-medium">{item.description}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <p className="font-semibold">{formatCurrency(item.amount)}</p>
+                          {isDraft && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditDeduction(item)}
+                              >
+                                <Pencil className="h-4 w-4 text-blue-600" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteDeduction(item.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        <DialogFooter className="border-t pt-4 px-6 pb-6">
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-3">
-              {isDraft && (
-                <>
-                  <span className="text-xs font-semibold text-gray-600">Konfigurasi Alokasi:</span>
-                  <div className="flex items-center bg-white border border-gray-300 rounded overflow-hidden focus-within:ring-1 focus-within:ring-blue-500">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      className="w-16 h-8 text-xs font-bold text-right focus:outline-none px-2"
-                      value={allocationPercentage}
-                      onChange={(e) => setAllocationPercentage(e.target.value)}
-                    />
-                    <div className="bg-gray-50 border-l border-gray-200 px-2 h-8 flex items-center">
-                      <span className="text-[10px] font-bold text-gray-400">%</span>
+        {!isCreateMode && (
+          <DialogFooter className="border-t pt-4 px-6 pb-6">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                {isDraft && (
+                  <>
+                    <span className="text-xs font-semibold text-gray-600">Konfigurasi Alokasi:</span>
+                    <div className="flex items-center bg-white border border-gray-300 rounded overflow-hidden focus-within:ring-1 focus-within:ring-blue-500">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        className="w-16 h-8 text-xs font-bold text-right focus:outline-none px-2"
+                        value={allocationPercentage}
+                        onChange={(e) => setAllocationPercentage(e.target.value)}
+                      />
+                      <div className="bg-gray-50 border-l border-gray-200 px-2 h-8 flex items-center">
+                        <span className="text-[10px] font-bold text-gray-400">%</span>
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </div>
+              <Button
+                size="sm"
+                onClick={handleFinalSave}
+                className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs px-8"
+              >
+                Simpan
+              </Button>
             </div>
-            <Button
-              size="sm"
-              onClick={handleFinalSave}
-              className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs px-8"
-            >
-              Simpan
-            </Button>
-          </div>
-        </DialogFooter>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )
 }
+
