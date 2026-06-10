@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import type { Pegawai, CreatePegawaiData, UpdatePegawaiData } from '@/lib/types/database.types'
+import type { Pegawai, CreatePegawaiData, UpdatePegawaiData, Role } from '@/lib/types/database.types'
 import { createPegawai as createPegawaiAction, updatePegawai as updatePegawaiAction } from '@/app/(authenticated)/pegawai/actions'
 
 /**
@@ -16,11 +16,8 @@ export async function getPegawai(
     let query = supabase
       .from('m_employees')
       .select(`
-        id, employee_code, full_name, unit_id, position, phone, 
-        nik, bank_name, bank_account_number, bank_account_name,
-        tax_status, employee_status, tax_type, pns_grade,
-        is_active, created_at, updated_at, 
-        m_units(name)
+        *,
+        m_units(name, code)
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
 
@@ -43,9 +40,8 @@ export async function getPegawai(
     // Transform data to match Pegawai type
     const transformedData: Pegawai[] = (data || []).map((item: any) => ({
       ...item,
-      m_units: Array.isArray(item.m_units) && item.m_units.length > 0
-        ? item.m_units[0]
-        : undefined
+      role: (item.role as Role) || 'employee',
+      m_units: Array.isArray(item.m_units) ? item.m_units[0] : item.m_units
     }))
 
     return { data: transformedData, count: count || 0 }
@@ -66,11 +62,8 @@ export async function getPegawaiById(
     const { data, error } = await supabase
       .from('m_employees')
       .select(`
-        id, employee_code, full_name, unit_id, position, phone,
-        nik, bank_name, bank_account_number, bank_account_name,
-        tax_status, employee_status, tax_type, pns_grade,
-        is_active, created_at, updated_at,
-        m_units(name)
+        *,
+        m_units(name, code)
       `)
       .eq('id', id)
       .single()
@@ -82,9 +75,8 @@ export async function getPegawaiById(
     // Transform data to match Pegawai type
     const transformedData: Pegawai = {
       ...data,
-      m_units: Array.isArray(data.m_units) && data.m_units.length > 0
-        ? data.m_units[0]
-        : undefined
+      role: (data.role as Role) || 'employee',
+      m_units: Array.isArray(data.m_units) ? data.m_units[0] : data.m_units
     }
 
     return { pegawai: transformedData }
@@ -134,7 +126,6 @@ export async function deactivatePegawai(
   try {
     const supabase = createClient()
 
-    // Update pegawai record
     const { error } = await supabase
       .from('m_employees')
       .update({
@@ -162,7 +153,6 @@ export async function deletePegawai(
   try {
     const supabase = createClient()
 
-    // Delete pegawai record (will cascade to related data via RLS)
     const { error } = await supabase
       .from('m_employees')
       .delete()
@@ -190,11 +180,8 @@ export async function getPegawaiByUnit(
     const { data, error } = await supabase
       .from('m_employees')
       .select(`
-        id, employee_code, full_name, unit_id, position, phone,
-        nik, bank_name, bank_account_number, bank_account_name,
-        tax_status, employee_status, tax_type, pns_grade,
-        is_active, created_at, updated_at,
-        m_units(name)
+        *,
+        m_units(name, code)
       `)
       .eq('unit_id', unitId)
       .eq('is_active', true)
@@ -204,12 +191,10 @@ export async function getPegawaiByUnit(
       return { data: [], error: error.message }
     }
 
-    // Transform data to match Pegawai type
     const transformedData: Pegawai[] = (data || []).map((item: any) => ({
       ...item,
-      m_units: Array.isArray(item.m_units) && item.m_units.length > 0
-        ? item.m_units[0]
-        : undefined
+      role: (item.role as Role) || 'employee',
+      m_units: Array.isArray(item.m_units) ? item.m_units[0] : item.m_units
     }))
 
     return { data: transformedData }
@@ -245,7 +230,6 @@ export async function hardDeletePegawai(
       }
     }
 
-    // Delete pegawai record
     const { error } = await supabase
       .from('m_employees')
       .delete()

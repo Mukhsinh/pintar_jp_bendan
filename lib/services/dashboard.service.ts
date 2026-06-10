@@ -781,8 +781,8 @@ export class DashboardService {
 
         const calcCatContrib = (catName: string) => {
           const catAss = empAss.filter(a => {
-            const indicator = Array.isArray(a.m_kpi_indicators) ? a.m_kpi_indicators[0] : a.m_kpi_indicators
-            const categoryObj = indicator?.m_kpi_categories
+            const indicator: any = Array.isArray(a.m_kpi_indicators) ? a.m_kpi_indicators[0] : a.m_kpi_indicators
+            const categoryObj: any = indicator?.m_kpi_categories
             const cat = Array.isArray(categoryObj) ? categoryObj[0]?.category : categoryObj?.category
             return cat === catName
           })
@@ -790,15 +790,15 @@ export class DashboardService {
           if (catAss.length === 0) return 0
 
           const first = catAss[0]
-          const indicator = Array.isArray(first.m_kpi_indicators) ? first.m_kpi_indicators[0] : first.m_kpi_indicators
-          const categoryObj = indicator?.m_kpi_categories
+          const indicator: any = Array.isArray(first.m_kpi_indicators) ? first.m_kpi_indicators[0] : first.m_kpi_indicators
+          const categoryObj: any = indicator?.m_kpi_categories
           const catWeight = parseFloat(Array.isArray(categoryObj) ? categoryObj[0]?.weight_percentage : categoryObj?.weight_percentage) || 0
 
           let totalR = 0, totalT = 0
           for (const a of catAss) {
-            const w = parseFloat(a.weight_percentage) || 0
-            totalR += (parseFloat(a.realization_value) || 0) * (w / 100)
-            totalT += (parseFloat(a.target_value) || 100) * (w / 100)
+            const w = parseFloat(a.weight_percentage as any) || 0
+            totalR += (parseFloat(a.realization_value as any) || 0) * (w / 100)
+            totalT += (parseFloat(a.target_value as any) || 100) * (w / 100)
           }
 
           return totalT > 0 ? (totalR / totalT) * catWeight : 0

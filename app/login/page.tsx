@@ -35,7 +35,20 @@ export default function LoginPage() {
     appName: string;
     address: string;
     logo: string;
-  } | null>(null)
+  } | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('company_info_cache')
+        if (cached) return JSON.parse(cached)
+      } catch { }
+    }
+    return {
+      name: "RSUD BENDAN",
+      appName: "Aplikasi PINTAR-JP",
+      address: "Jl. Sriwijaya no. 2 Kota Pekalongan Provinsi Jawa Tengah",
+      logo: ""
+    }
+  })
   const [isReady, setIsReady] = useState(false)
   const searchParams = useSearchParams()
 
@@ -158,7 +171,7 @@ export default function LoginPage() {
             {companyInfo?.appName || "Aplikasi PINTAR-JP"}
           </p>
           <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-2 text-center max-w-[280px] leading-relaxed">
-            {companyInfo?.address || "Jl. Sriwijaya No. 2, Kota Pekalongan"}
+            {companyInfo?.address || "Jl. Sriwijaya no. 2 Kota Pekalongan Provinsi Jawa Tengah"}
           </p>
           <div className="w-12 h-[2px] bg-blue-200 rounded-full mt-3" />
         </div>

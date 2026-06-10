@@ -442,36 +442,60 @@ export default function PoolDetailsDialog({
 
         <div className="space-y-6 py-4">
           {isCreateMode ? (
-            <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-blue-800 uppercase tracking-wider">Periode *</label>
-                <Input
-                  type="month"
-                  value={createPeriod}
-                  onChange={(e) => setCreatePeriod(e.target.value)}
-                  className="bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-blue-800 uppercase tracking-wider">Alokasi Global (%) *</label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={allocationPercentage}
-                    onChange={(e) => setAllocationPercentage(e.target.value)}
-                    className="bg-white"
-                  />
-                  <Button onClick={handleCreatePool} disabled={isSubmitting}>
-                    {isSubmitting ? 'Memproses...' : 'Lanjut'}
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wider">Inisialisasi Pool</h3>
+                    <p className="text-[10px] text-blue-600 mt-0.5">Tentukan periode untuk mulai mengelola pendapatan dan potongan</p>
+                  </div>
+                  <Button
+                    onClick={handleCreatePool}
+                    disabled={isSubmitting || !createPeriod}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isSubmitting ? 'Memproses...' : 'Buat Draft Pool'}
                   </Button>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest pl-1">Periode</label>
+                    <Input
+                      type="month"
+                      value={createPeriod}
+                      onChange={(e) => setCreatePeriod(e.target.value)}
+                      className="bg-white border-blue-200 focus:border-blue-400 focus:ring-blue-50"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-blue-700 uppercase tracking-widest pl-1">Alokasi Global (%)</label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={allocationPercentage}
+                        onChange={(e) => setAllocationPercentage(e.target.value)}
+                        className="bg-white border-blue-200 focus:border-blue-400 focus:ring-blue-50"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="col-span-2 text-[10px] text-blue-600 font-medium">
-                Pilih periode dan tentukan persentase alokasi, lalu klik Lanjut untuk menambahkan rincian.
-              </p>
+
+              {/* Disabled preview of items to show they come next */}
+              <div className="opacity-40 pointer-events-none space-y-6">
+                <div className="h-20 bg-gray-50 border border-dashed border-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-400">
+                  Ringkasan Keuangan (Akan muncul setelah pool dibuat)
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-gray-400">Item Pendapatan</h3>
+                  <div className="h-10 bg-gray-50 border border-gray-100 rounded"></div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-4 gap-2 p-3 bg-gray-50 border border-gray-100 rounded-lg mb-6">

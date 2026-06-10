@@ -48,8 +48,8 @@ export interface Database {
           employee_code: string
           full_name: string
           unit_id: string
-          role: string
-          email: string
+          role: string | null
+          email: string | null
           tax_status: string | null
           employment_status: 'PNS' | 'PPPK' | 'PPPK PARUH WAKTU' | 'BLUD' | null
           employee_status: string | null
@@ -71,8 +71,8 @@ export interface Database {
           employee_code: string
           full_name: string
           unit_id: string
-          role?: string
-          email?: string
+          role?: string | null
+          email?: string | null
           tax_status?: string | null
           employment_status?: 'PNS' | 'PPPK' | 'PPPK PARUH WAKTU' | 'BLUD' | null
           employee_status?: string | null
@@ -94,8 +94,8 @@ export interface Database {
           employee_code?: string
           full_name?: string
           unit_id?: string
-          role?: string
-          email?: string
+          role?: string | null
+          email?: string | null
           tax_status?: string | null
           employment_status?: 'PNS' | 'PPPK' | 'PPPK PARUH WAKTU' | 'BLUD' | null
           employee_status?: string | null
@@ -132,14 +132,16 @@ export interface Database {
 // Application Specific Types
 // ============================================
 
+export type Role = 'superadmin' | 'unit_manager' | 'employee'
+
 export interface Pegawai {
   id: string
   user_id: string | null
   employee_code: string
   full_name: string
   unit_id: string
-  role: string
-  email: string
+  role: Role
+  email: string | null
   tax_status: string | null
   employment_status: 'PNS' | 'PPPK' | 'PPPK PARUH WAKTU' | 'BLUD' | null
   employee_status: string | null
@@ -161,7 +163,7 @@ export interface Pegawai {
 }
 
 export interface UserMetadata {
-  role: 'superadmin' | 'unit_manager' | 'employee'
+  role: Role
   full_name?: string
   employee_id?: string
   unit_id?: string
@@ -170,8 +172,37 @@ export interface UserMetadata {
 export interface UserWithEmployee {
   id: string
   email: string
-  user_metadata: UserMetadata
+  role: Role
+  employeeId: string
+  employeeCode: string
+  fullName: string
+  unitId: string
+  taxStatus: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
   employee?: Pegawai | null
+}
+
+export interface CreateUserInput {
+  email: string
+  password?: string
+  employeeCode: string
+  fullName: string
+  unitId: string
+  role: Role
+  taxStatus?: string
+}
+
+export interface UpdateUserInput {
+  email?: string
+  password?: string
+  employeeCode?: string
+  fullName?: string
+  unitId?: string
+  role?: Role
+  taxStatus?: string
+  isActive?: boolean
 }
 
 export interface CreatePegawaiData {
@@ -189,7 +220,7 @@ export interface CreatePegawaiData {
   employee_status?: string | null
   tax_type?: 'Final' | 'TER' | null
   pns_grade?: string | null
-  role?: string | null
+  role?: Role | null
   is_active?: boolean
 }
 

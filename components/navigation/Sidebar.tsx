@@ -147,7 +147,25 @@ export default function Sidebar() {
 
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [companyInfo, setCompanyInfo] = useState<any>(null)
+  const [companyInfo, setCompanyInfo] = useState<{
+    name: string;
+    appName: string;
+    address: string;
+    logo: string;
+  } | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('company_info_cache')
+        if (cached) return JSON.parse(cached)
+      } catch { }
+    }
+    return {
+      name: "RSUD BENDAN",
+      appName: "Aplikasi PINTAR-JP",
+      address: "Jl. Sriwijaya no. 2 Kota Pekalongan Provinsi Jawa Tengah",
+      logo: ""
+    }
+  })
   const [unitName, setUnitName] = useState('')
   const [unreadCount, setUnreadCount] = useState(0)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
